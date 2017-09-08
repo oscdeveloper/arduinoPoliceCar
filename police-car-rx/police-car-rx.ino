@@ -12,6 +12,8 @@
 #define PIN_MOTOR_FORWARD 5
 #define PIN_MOTOR_REVERSE 6
 
+#define PIN_HORN 11
+
 const byte thisSlaveAddress[5] = {'l','e','g','o','1'};
 RF24 radio(PIN_RF24_CE, PIN_RF24_CSN);
 
@@ -20,6 +22,10 @@ int dataReceived[6]; // this must match dataToSend in the TX
 Servo steeringServo;
 
 unsigned int motorSpeed;
+
+unsigned int speedIntervalMin;
+unsigned int speedIntervalMax;
+
 unsigned int steering;
 
 void setup() {
@@ -38,6 +44,16 @@ void setup() {
   analogWrite(PIN_MOTOR_FORWARD, 0); 
   analogWrite(PIN_MOTOR_REVERSE, 0); 
 
+  pinMode(PIN_HORN, OUTPUT);
+
+  tone(PIN_HORN, 4000);
+  delay(100);  
+  noTone(PIN_HORN);
+  delay(100);
+  tone(PIN_HORN, 4000); 
+  delay(100); 
+  noTone(PIN_HORN);  
+
 }
 
 void loop() {
@@ -46,13 +62,16 @@ void loop() {
     
     radio.read( &dataReceived, sizeof(dataReceived) );
 
+    // gear change
+    getSpeedIntervalToGear(dataReceived[5]);
+
     // motor
     if ( dataReceived[3] < 128 ) { // forward
-      motorSpeed = map(dataReceived[3], 127, 0, 100, 255);
+      motorSpeed = map(dataReceived[3], 127, 0, speedIntervalMin, speedIntervalMax);
       analogWrite(PIN_MOTOR_FORWARD, motorSpeed);
       digitalWrite(PIN_MOTOR_REVERSE, 0);
     } else if ( dataReceived[3] > 128 ) { // reverse
-      motorSpeed = map(dataReceived[3], 129, 255, 100, 255);
+      motorSpeed = map(dataReceived[3], 129, 255, speedIntervalMin, speedIntervalMax);
       digitalWrite(PIN_MOTOR_FORWARD, 0);
       analogWrite(PIN_MOTOR_REVERSE, motorSpeed);
     } else { // stop
@@ -73,4 +92,22 @@ void loop() {
 
   }
 
+}
+
+void getSpeedIntervalToGear (int gearNumber) {
+
+  switch (gearNumber) {
+    case 1:
+      speedIntervalMin = 100;
+      speedIntervalMax = 150;
+      break;
+    case 2:
+      speedIntervalMin = 150;
+      speedIntervalMax = 200;
+      break;     
+    case 3:
+      speedIntervalMin = 200;
+      speedIntervalMax = 255;
+      break;
+  }
 }
